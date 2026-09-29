@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12252b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>ردیاب مطالعه</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e9efee;--card:#fff;--ink:#12252b;--mute:#5d7378;--line:#d3dedd;--ok:#1b8a6b;--mid:#d99a00;--bad:#c9473d;--acc:#12252b}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1a1e;--card:#16272c;--ink:#e6efee;--mute:#8fa8ac;--line:#28404640;--acc:#e6efee}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Vazirmatn,Tahoma,sans-serif;line-height:1.7}
+main{max-width:560px;margin:0 auto;padding:calc(12px + env(safe-area-inset-top)) 14px calc(96px + env(safe-area-inset-bottom))}
+h1{font-size:1.3rem;margin:8px 0 12px;font-weight:800}
+nav{display:flex;gap:6px;position:fixed;bottom:0;left:0;right:0;background:var(--bg);padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:5}
+nav button{flex:1;padding:12px 2px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;font:inherit;font-size:.82rem;cursor:pointer}
+nav button.on{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.name{font-weight:600}
+.time{font-variant-numeric:tabular-nums;color:var(--mute);font-size:.9rem}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--ok);border-radius:4px}
+button.b{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:10px 12px;min-height:46px;font:inherit;cursor:pointer}
+button.go{background:var(--ok);border-color:var(--ok);color:#fff}
+button.stop{background:var(--bad);border-color:var(--bad);color:#fff}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--mid);outline-offset:2px}
+input,select{font:inherit;font-size:16px;padding:10px;min-height:44px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);max-width:100%}
+.big{font-size:1.6rem;font-weight:800}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px;text-align:center;font-size:.72rem;color:var(--mute)}
+.days div span{display:block;height:34px;border-radius:5px;background:var(--line);margin-bottom:2px}
+.pill{font-size:.8rem;padding:1px 8px;border-radius:99px;color:#fff}
+.mute{color:var(--mute);font-size:.85rem}
+svg text{fill:var(--mute);font-size:10px;font-family:inherit}
+.hide{display:none}
+body{-webkit-tap-highlight-color:transparent}
+.acts{display:flex;gap:8px;margin-top:10px}.acts .b{flex:1;padding:10px 4px}.acts .b:first-child{flex:2}
+</style>
+</head>
+<body>
+<main>
+<h1>ردیاب مطالعه</h1>
+<nav>
+  <button data-t="today" class="on">امروز</button>
+  <button data-t="report">گزارش هفتگی</button>
+  <button data-t="history">روند بلندمدت</button>
+  <button data-t="setup">تنظیمات</button>
+</nav>
+<section id="today"></section>
+<section id="report" class="hide"></section>
+<section id="history" class="hide"></section>
+<section id="setup" class="hide"></section>
+</main>
+<script>
+const KEY='study-tracker-v1';
+const fa=n=>Math.round(n).toLocaleString('fa-IR');
+const DEF=[['زبان',120],['جزوه فنی‌حرفه‌ای',120],['متفرقه',120],['مقاله',120],['گوش دادن به فایل صوتی',60]];
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.goals){s.start=s.start||today();return s}}catch(e){}
+  return{goals:DEF.map((g,i)=>({id:'g'+i,name:g[0],target:g[1],period:'day'})),logs:{},running:{},start:today()}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const key=d=>{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')};
+const today=()=>key(Date.now());
+let S=load();
+// week starts on Saturday
+function weekStart(d){const x=new Date(d);x.setHours(12,0,0,0);x.setDate(x.getDate()-((x.getDay()+1)%7));return x}
+function weekDays(ws){return[...Array(7)].map((_,i)=>{const x=new Date(ws);x.setDate(x.getDate()+i);return key(x)})}
+const dm=(s,o)=>new Date(s+'T12:00:00').toLocaleDateString('fa-IR-u-ca-persian',o);
+function fmt(sec){sec=Math.max(0,Math.floor(sec));const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60);
+  return h?fa(h)+' ساعت'+(m?' و '+fa(m)+' دقیقه':''):fa(m)+' دقیقه'}
+function clock(sec){sec=Math.floor(sec);const p=n=>String(n).padStart(2,'0');
+  return (p(Math.floor(sec/3600))+':'+p(Math.floor(sec%3600/60))+':'+p(sec%60)).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d])}
+function logged(id,day){return(S.logs[day]&&S.logs[day][id])||0}
+function live(id){return S.running[id]?(Date.now()-S.running[id])/1000:0}
+function add(id,day,sec){S.logs[day]=S.logs[day]||{};S.logs[day][id]=Math.max(0,(S.logs[day][id]||0)+sec)}
+function dailyT(g){return g.period==='day'?g.target*60:g.target*60/7}
+function activeDays(ws){return weekDays(ws).filter(d=>d>=S.start).length}
+function weeklyT(g,ws){const n=ws?activeDays(ws):7;return g.period==='day'?g.target*60*n:g.target*60*n/7}
+function weekSum(id,ws,withLive){return weekDays(ws).reduce((a,d)=>a+logged(id,d),0)+(withLive&&weekDays(ws).includes(today())?live(id):0)}
+function color(p){return p>=1?'var(--ok)':p>=.6?'var(--mid)':'var(--bad)'}
+
+function start(id){S.running[id]=Date.now();save();render()}
+function stop(id){const sec=live(id);const day=key(S.running[id]);delete S.running[id];add(id,day,sec);save();render()}
+
+function renderToday(){
+  const el=document.getElementById('today');
+  el.innerHTML=S.goals.length?S.goals.map(g=>{
+    const done=logged(g.id,today())+live(g.id),t=dailyT(g),p=t?done/t:0,on=!!S.running[g.id];
+    return`<div class="card" data-id="${g.id}"><div class="row"><div class="grow"><div class="name">${esc(g.name)}</div>
+    <div class="time"><span class="d">${clock(done)}</span> از ${fmt(t)}</div></div>
+    </div>
+    <div class="acts"><button class="b ${on?'stop':'go'}" data-a="${on?'stop':'start'}">${on?'توقف':'شروع'}</button><button class="b" data-a="man">+ دقیقه</button><button class="b" data-a="reset">صفر کردن</button></div>
+    <div class="bar"><i style="width:${Math.min(100,p*100)}%;background:${color(p)}"></i></div></div>`}).join('')
+    :'<p class="mute">هنوز هدفی تعریف نکرده‌اید. از بخش تنظیمات یک هدف اضافه کنید.</p>';
+}
+function tick(){ // light live update without rebuilding
+  document.querySelectorAll('#today .card').forEach(c=>{
+    const g=S.goals.find(x=>x.id===c.dataset.id);if(!g)return;
+    const done=logged(g.id,today())+live(g.id),t=dailyT(g),p=t?done/t:0;
+    c.querySelector('.d').textContent=clock(done);
+    const b=c.querySelector('.bar i');b.style.width=Math.min(100,p*100)+'%';b.style.background=color(p)});
+}
+document.getElementById('today').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;const id=b.closest('.card').dataset.id,a=b.dataset.a;
+  if(a==='start')start(id);else if(a==='stop')stop(id);
+  else if(a==='reset'){if(confirm('زمان امروزِ این تسک صفر شود؟')){delete S.running[id];if(S.logs[today()])S.logs[today()][id]=0;save();render()}}
+  else if(a==='man'){const v=prompt('چند دقیقه اضافه شود؟ (برای کم کردن عدد منفی بنویسید)');const n=parseFloat(v);
+    if(n){add(id,today(),n*60);save();render()}}
+});
+
+let off=0;
+function weekStats(ws,withLive){
+  return S.goals.map(g=>{const a=weekSum(g.id,ws,withLive),t=weeklyT(g,ws);return{g,a,t,p:t?a/t:0}})}
+function renderReport(){
+  const ws=weekStart(Date.now());ws.setDate(ws.getDate()+off*7);
+  const days=weekDays(ws),st=weekStats(ws,true);
+  const tot=st.reduce((a,x)=>a+x.t,0),got=st.reduce((a,x)=>a+Math.min(x.a,x.t),0),P=tot?got/tot:0;
+  const el=document.getElementById('report');
+  el.innerHTML=`<div class="card"><div class="row"><button class="b" id="nx">هفته بعد ›</button><div class="grow" style="text-align:center">
+  <b>${dm(days[0],{day:'numeric',month:'long'})} تا ${dm(days[6],{day:'numeric',month:'long'})}</b>${off===0?'<div class="mute">هفته جاری</div>':''}</div>
+  <button class="b" id="pv">‹ هفته قبل</button></div>
+  <div style="text-align:center;margin-top:10px"><div class="big" style="color:${color(P)}">${fa(P*100)}٪</div><div class="mute">میزان رسیدن به اهداف هفته</div></div>${activeDays(ws)<7?`<div class="mute" style="margin-top:8px">هدف این هفته بر اساس ${fa(activeDays(ws))} روز فعال محاسبه شده است.</div>`:''}</div>`+
+  st.map(x=>{const dd=days.map(d=>logged(x.g.id,d)+(d===today()?live(x.g.id):0));
+    const rem=x.t-x.a;
+    return`<div class="card"><div class="row"><div class="grow name">${esc(x.g.name)}</div>
+    <span class="pill" style="background:${color(x.p)}">${fa(x.p*100)}٪</span></div>
+    <div class="time">${fmt(x.a)} از ${fmt(x.t)} — ${rem>0?fmt(rem)+' کم‌کاری':'هدف کامل شد'+(rem<0?' (+'+fmt(-rem)+')':'')}</div>
+    <div class="bar"><i style="width:${Math.min(100,x.p*100)}%;background:${color(x.p)}"></i></div>
+    <div class="days">${dd.map((v,i)=>{const t=dailyT(x.g),h=t?Math.min(1,v/t):0;
+      return`<div style="opacity:${days[i]<S.start?.35:1}"><span style="background:linear-gradient(to top,${color(h)} ${h*100}%,var(--line) ${h*100}%)"></span>${dm(days[i],{weekday:'narrow'})}</div>`}).join('')}</div></div>`}).join('');
+  document.getElementById('pv').onclick=()=>{if(days[0]>S.start){off--;renderReport()}};
+  document.getElementById('nx').onclick=()=>{if(off<0){off++;renderReport()}};
+}
+
+function renderHistory(){
+  const N=12,el=document.getElementById('history'),cur=weekStart(Date.now()),rows=[];
+  for(let i=N-1;i>=0;i--){const ws=new Date(cur);ws.setDate(ws.getDate()-i*7);if(weekDays(ws)[6]<S.start)continue;const st=weekStats(ws,true);
+    const tot=st.reduce((a,x)=>a+x.t,0),got=st.reduce((a,x)=>a+Math.min(x.a,x.t),0);rows.push({ws,p:tot?got/tot:0})}
+  const W=600,H=180,bw=W/Math.max(rows.length,4);
+  const bars=rows.map((r,i)=>{const h=Math.min(1,r.p)*(H-30);
+    return`<rect x="${i*bw+6}" y="${H-20-h}" width="${bw-12}" height="${h}" rx="4" fill="${color(r.p)}"/>
+    <text x="${i*bw+bw/2}" y="${H-6}" text-anchor="middle">${dm(key(r.ws),{day:'numeric',month:'numeric'})}</text>
+    <text x="${i*bw+bw/2}" y="${H-24-h}" text-anchor="middle">${fa(r.p*100)}</text>`}).join('');
+  const per=S.goals.map(g=>{
+    const v=rows.map(r=>weekSum(g.id,r.ws,true)),ok=v.filter((x,i)=>{const t=weeklyT(g,rows[i].ws);return t>0&&x>=t}).length;
+    const done=v.filter(x=>x>0),avg=done.length?done.reduce((a,b)=>a+b,0)/done.length:0;
+    return`<div class="card"><div class="row"><div class="grow name">${esc(g.name)}</div><span class="mute">میانگین هفتگی: ${fmt(avg)}</span></div>
+    <div class="mute">در ${fa(ok)} هفته از ${fa(rows.length)} هفته اخیر به هدف رسیده‌اید</div></div>`}).join('');
+  const streak=(()=>{let s=0;for(let i=rows.length-1;i>=0;i--){if(rows[i].p>=.8)s++;else if(i===rows.length-1)continue;else break}return s})();
+  el.innerHTML=`<div class="card"><b>درصد تحقق اهداف در ${fa(rows.length)} هفته اخیر</b>
+  <svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="نمودار هفتگی">${bars}</svg>
+  <div class="mute">هفته‌های پیاپی با تحقق حداقل ۸۰٪: ${fa(streak)}</div></div>`+per;
+}
+
+function renderSetup(){
+  const el=document.getElementById('setup');
+  el.innerHTML=`<div class="card"><label class="name" for="sd">تاریخ شروع پیگیری</label><div class="row" style="margin-top:6px"><input type="date" id="sd" value="${S.start}"><button class="b" id="sdt">از امروز</button></div><div class="mute">روزهای قبل از این تاریخ در هدف هفته حساب نمی‌شوند. اگر وسط هفته شروع کنید، هدف همان هفته متناسب با روزهای باقی‌مانده کم می‌شود.</div></div>`+S.goals.map(g=>`<div class="card row" data-id="${g.id}">
+   <input class="grow" data-f="name" value="${esc(g.name)}" aria-label="نام">
+   <input data-f="target" type="number" min="0" step="5" value="${g.target}" style="width:80px" aria-label="دقیقه">
+   <select data-f="period"><option value="day"${g.period==='day'?' selected':''}>دقیقه در روز</option><option value="week"${g.period==='week'?' selected':''}>دقیقه در هفته</option></select>
+   <button class="b" data-a="del">حذف</button></div>`).join('')+
+  `<div class="card"><button class="b" id="addg">افزودن هدف</button></div>
+   <div class="card"><div class="row"><button class="b" id="exp">دریافت پشتیبان</button><button class="b" id="imp">بازیابی پشتیبان</button>
+   <input type="file" id="file" accept=".json" class="hide"></div>
+   <p class="mute">داده‌ها فقط در همین مرورگر ذخیره می‌شوند. برای انتقال به گوشی یا مرورگر دیگر، پشتیبان بگیرید و در آنجا بازیابی کنید.</p></div>`;
+}
+document.getElementById('setup').addEventListener('change',e=>{
+  const c=e.target.closest('.card'),f=e.target.dataset.f;if(!c||!f)return;
+  const g=S.goals.find(x=>x.id===c.dataset.id);g[f]=f==='target'?(parseFloat(e.target.value)||0):e.target.value;save()});
+document.getElementById('setup').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.a==='del'){const id=b.closest('.card').dataset.id;
+    if(confirm('این هدف حذف شود؟ تاریخچه‌اش هم از گزارش‌ها کنار می‌رود.')){S.goals=S.goals.filter(g=>g.id!==id);delete S.running[id];save();renderSetup()}}
+  else if(b.id==='sdt'){S.start=today();save();renderSetup()}
+  else if(b.id==='addg'){S.goals.push({id:'g'+Date.now(),name:'هدف جدید',target:60,period:'day'});save();renderSetup()}
+  else if(b.id==='exp'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'}));a.download='study-backup-'+today()+'.json';a.click()}
+  else if(b.id==='imp')document.getElementById('file').click();
+});
+document.getElementById('setup').addEventListener('change',e=>{
+  if(e.target.id!=='file'||!e.target.files[0])return;const r=new FileReader();
+  r.onload=()=>{try{const s=JSON.parse(r.result);if(!s.goals||!s.logs)throw 0;S=s;S.start=S.start||today();save();renderSetup();alert('پشتیبان بازیابی شد.')}catch(x){alert('فایل معتبر نیست.')}};
+  r.readAsText(e.target.files[0])});
+
+document.getElementById('setup').addEventListener('change',e=>{if(e.target.id==='sd'&&e.target.value){S.start=e.target.value;save()}});
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+let tab='today';
+function render(){({today:renderToday,report:renderReport,history:renderHistory,setup:renderSetup})[tab]()}
+document.querySelector('nav').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;tab=b.dataset.t;
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('main section').forEach(s=>s.classList.toggle('hide',s.id!==tab));render()});
+setInterval(()=>{if(tab==='today')tick()},1000);
+render();
+</script>
+</body>
+</html>
